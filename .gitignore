@@ -6,3 +6,4 @@ obj/
 .dart_tool/
 build/
 *.pdf
+.claude/

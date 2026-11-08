@@ -1,122 +1,105 @@
 import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { STUDENT_ID_RX, type Hold } from './api'
+import ApplicationView from './components/ApplicationView'
+import ClassList from './components/ClassList'
+import CreateClass from './components/CreateClass'
+import MyApplications from './components/MyApplications'
+import './index.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+type Tab = 'classes' | 'create' | 'mine'
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function load(key: string): string {
+  try {
+    return localStorage.getItem(key) ?? ''
+  } catch {
+    return ''
+  }
+}
+function save(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    /* storage unavailable: app still works, it just will not remember */
+  }
 }
 
-export default App
+export default function App() {
+  const [studentInput, setStudentInput] = useState(() => load('studentId'))
+  const [tab, setTab] = useState<Tab>(() => (load('tab') as Tab) || 'classes')
+  const [holdId, setHoldId] = useState<string | null>(() => load('holdId') || null)
+
+  const trimmed = studentInput.trim()
+  const student = STUDENT_ID_RX.test(trimmed) ? trimmed : null
+  const studentError = trimmed !== '' && !student ? 'The birth registration number must be exactly 17 digits.' : null
+
+  function changeStudent(v: string) {
+    setStudentInput(v)
+    save('studentId', v)
+  }
+  function go(t: Tab) {
+    setTab(t)
+    save('tab', t)
+    setHoldId(null)
+    save('holdId', '')
+  }
+  function openHold(id: string) {
+    setHoldId(id)
+    save('holdId', id)
+  }
+  function applied(h: Hold) {
+    setTab('mine')
+    save('tab', 'mine')
+    openHold(h.holdId)
+  }
+  function back() {
+    setHoldId(null)
+    save('holdId', '')
+  }
+
+  return (
+    <div className="container">
+      <header>
+        <h1>School Admission System</h1>
+        <div className="student">
+          <label htmlFor="student-id">Student birth registration number (17 digits)</label>
+          <input
+            id="student-id"
+            value={studentInput}
+            onChange={(e) => changeStudent(e.target.value)}
+            inputMode="numeric"
+            maxLength={17}
+            placeholder="20152691234567890"
+            aria-invalid={!!studentError}
+          />
+          {studentError && (
+            <div className="field-error" role="alert">
+              {studentError}
+            </div>
+          )}
+        </div>
+        <nav>
+          <button className={tab === 'classes' ? 'tab active' : 'tab'} onClick={() => go('classes')}>
+            Classes
+          </button>
+          <button className={tab === 'mine' ? 'tab active' : 'tab'} onClick={() => go('mine')}>
+            My applications
+          </button>
+          <button className={tab === 'create' ? 'tab active' : 'tab'} onClick={() => go('create')}>
+            Create class (admin)
+          </button>
+        </nav>
+      </header>
+      <main>
+        {holdId ? (
+          <ApplicationView holdId={holdId} student={student} onBack={back} />
+        ) : tab === 'classes' ? (
+          <ClassList student={student} onApplied={applied} onNeedStudent={() => undefined} />
+        ) : tab === 'mine' ? (
+          <MyApplications student={student} onOpen={openHold} />
+        ) : (
+          <CreateClass />
+        )}
+      </main>
+    </div>
+  )
+}

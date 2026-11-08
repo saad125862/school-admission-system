@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 using SchoolAdmission.Api;
 
@@ -11,6 +12,9 @@ if (!string.IsNullOrEmpty(port)) builder.WebHost.UseUrls($"http://+:{port}");
 
 builder.Services.AddDbContext<AppDb>(o => o.UseNpgsql(ConnectionString(builder.Configuration)));
 builder.Services.AddHostedService<ExpirySweeper>();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(o => o.SwaggerDoc("v1", new() { Title = "School Admission System API", Version = "v1",
+    Description = "First-come-first-served school admission with timed seat holds. Student identity is the 17-digit birth registration number sent in the X-Student-Id header." }));
 
 var origins = (Environment.GetEnvironmentVariable("CORS_ORIGINS") ?? "*")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -22,6 +26,9 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
 
 var app = builder.Build();
 app.UseCors();
+app.UseSwagger();
+app.UseSwaggerUI(o => o.SwaggerEndpoint("/swagger/v1/swagger.json", "School Admission API v1"));
+app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 
 var holdSeconds = int.TryParse(Environment.GetEnvironmentVariable("HOLD_DURATION_SECONDS"), out var hs) && hs > 0 ? hs : 600;
 var studentIdRx = new Regex(@"^\d{17}$");
@@ -30,7 +37,6 @@ await InitDb(app);
 
 IResult Err(int code, string message) => Results.Json(new { error = message }, statusCode: code);
 string NewId(string prefix) => prefix + Guid.NewGuid().ToString("N")[..12];
-string? StudentHeader(HttpRequest r) => r.Headers["X-Student-Id"].FirstOrDefault()?.Trim();
 bool ValidStudent(string? s) => s is not null && studentIdRx.IsMatch(s);
 string Effective(Hold h, DateTime now) => h.Status == "HELD" && h.ExpiresAt <= now ? "EXPIRED" : h.Status;
 string Utc(DateTime d) => DateTime.SpecifyKind(d, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
@@ -62,7 +68,8 @@ app.MapPost("/classes", async (CreateClass? req, AppDb db) =>
     db.Classes.Add(c);
     await db.SaveChangesAsync();
     return Results.Json(new { id = c.Id, name = c.Name, totalSeats = c.TotalSeats }, statusCode: 201);
-});
+})
+    .WithTags("Classes").WithSummary("Create a class (one shift = one class)").WithDescription("201 with the created class; 400 on invalid name or seat count.");
 
 // 2. List classes
 app.MapGet("/classes", async (AppDb db) =>
@@ -74,7 +81,8 @@ app.MapGet("/classes", async (AppDb db) =>
     return Results.Ok(classes.Select(c => ClassView(c,
         counts.FirstOrDefault(x => x.ClassId == c.Id && x.Status == "HELD")?.N ?? 0,
         counts.FirstOrDefault(x => x.ClassId == c.Id && x.Status == "CONFIRMED")?.N ?? 0)));
-});
+})
+    .WithTags("Classes").WithSummary("List all classes with seat counts").WithDescription("heldSeats counts unexpired holds; availableSeats = totalSeats - held - confirmed.");
 
 // 3. One class
 app.MapGet("/classes/{classId}", async (string classId, AppDb db) =>
@@ -83,12 +91,13 @@ app.MapGet("/classes/{classId}", async (string classId, AppDb db) =>
     if (c is null) return Err(404, "Class not found.");
     var (held, confirmed) = await Counts(db, classId, DateTime.UtcNow);
     return Results.Ok(ClassView(c, held, confirmed));
-});
+})
+    .WithTags("Classes").WithSummary("Get one class").WithDescription("404 if the class does not exist.");
 
 // 4. Apply (seat hold)
-app.MapPost("/classes/{classId}/holds", async (string classId, HttpRequest req, AppDb db) =>
+app.MapPost("/classes/{classId}/holds", async (string classId, [FromHeader(Name = "X-Student-Id")] string? studentId, AppDb db) =>
 {
-    var student = StudentHeader(req);
+    var student = studentId?.Trim();
     if (!ValidStudent(student)) return Err(400, "X-Student-Id must be a 17-digit birth registration number.");
     if (!await db.Classes.AnyAsync(c => c.Id == classId)) return Err(404, "Class not found.");
 
@@ -113,7 +122,8 @@ app.MapPost("/classes/{classId}/holds", async (string classId, HttpRequest req, 
     catch (DbUpdateException) { return Err(409, "You already have an active application or confirmed admission for this class."); }
     await tx.CommitAsync();
     return Results.Json(HoldView(hold, now), statusCode: 201);
-});
+})
+    .WithTags("Applications").WithSummary("Apply: hold a seat for the student").WithDescription("201 with the hold. 409 if no seat is left or the student already has an active/confirmed application in this class. 400 for a missing/invalid X-Student-Id.");
 
 // 5. Hold status
 app.MapGet("/holds/{holdId}", async (string holdId, AppDb db) =>
@@ -121,12 +131,13 @@ app.MapGet("/holds/{holdId}", async (string holdId, AppDb db) =>
     var h = await db.Holds.AsNoTracking().FirstOrDefaultAsync(x => x.Id == holdId);
     if (h is null) return Err(404, "Application not found.");
     return Results.Ok(HoldView(h, DateTime.UtcNow));
-});
+})
+    .WithTags("Applications").WithSummary("Get an application's current status").WithDescription("Status is HELD, CONFIRMED, EXPIRED or CANCELLED. An overdue HELD hold is reported as EXPIRED.");
 
 // 6. Confirm (pay admission fee)
-app.MapPost("/holds/{holdId}/confirm", async (string holdId, HttpRequest req, AppDb db) =>
+app.MapPost("/holds/{holdId}/confirm", async (string holdId, [FromHeader(Name = "X-Student-Id")] string? studentId, AppDb db) =>
 {
-    var student = StudentHeader(req);
+    var student = studentId?.Trim();
     if (!ValidStudent(student)) return Err(400, "X-Student-Id must be a 17-digit birth registration number.");
     await using var tx = await db.Database.BeginTransactionAsync();
     var rows = await db.Holds.FromSqlInterpolated($"SELECT * FROM holds WHERE \"Id\" = {holdId} FOR UPDATE").ToListAsync();
@@ -146,12 +157,13 @@ app.MapPost("/holds/{holdId}/confirm", async (string holdId, HttpRequest req, Ap
     await db.SaveChangesAsync();
     await tx.CommitAsync();
     return Results.Ok(new { holdId = h.Id, status = "CONFIRMED" });
-});
+})
+    .WithTags("Applications").WithSummary("Pay the admission fee and confirm the admission").WithDescription("Idempotent: confirming an already CONFIRMED hold returns 200 without counting the seat again. 409 if expired/cancelled. 404 if the hold belongs to another student.");
 
 // 7. Cancel
-app.MapDelete("/holds/{holdId}", async (string holdId, HttpRequest req, AppDb db) =>
+app.MapDelete("/holds/{holdId}", async (string holdId, [FromHeader(Name = "X-Student-Id")] string? studentId, AppDb db) =>
 {
-    var student = StudentHeader(req);
+    var student = studentId?.Trim();
     if (!ValidStudent(student)) return Err(400, "X-Student-Id must be a 17-digit birth registration number.");
     await using var tx = await db.Database.BeginTransactionAsync();
     var rows = await db.Holds.FromSqlInterpolated($"SELECT * FROM holds WHERE \"Id\" = {holdId} FOR UPDATE").ToListAsync();
@@ -165,12 +177,13 @@ app.MapDelete("/holds/{holdId}", async (string holdId, HttpRequest req, AppDb db
     }
     await tx.CommitAsync();
     return Results.NoContent(); // already EXPIRED/CANCELLED: idempotent 204
-});
+})
+    .WithTags("Applications").WithSummary("Cancel an application and free the seat").WithDescription("204 on success (also when already cancelled/expired). 409 for a confirmed admission. 404 if it belongs to another student.");
 
 // 8. My applications
-app.MapGet("/me/holds", async (HttpRequest req, AppDb db) =>
+app.MapGet("/me/holds", async ([FromHeader(Name = "X-Student-Id")] string? studentId, AppDb db) =>
 {
-    var student = StudentHeader(req);
+    var student = studentId?.Trim();
     if (!ValidStudent(student)) return Err(400, "X-Student-Id must be a 17-digit birth registration number.");
     var now = DateTime.UtcNow;
     var list = await (from h in db.Holds.AsNoTracking()
@@ -183,7 +196,8 @@ app.MapGet("/me/holds", async (HttpRequest req, AppDb db) =>
         holdId = x.h.Id, classId = x.h.ClassId, className = x.Name,
         status = Effective(x.h, now), expiresAt = Utc(x.h.ExpiresAt)
     }));
-});
+})
+    .WithTags("Applications").WithSummary("List the student's applications").WithDescription("All applications of the student in X-Student-Id, newest first.");
 
 app.Run();
 
