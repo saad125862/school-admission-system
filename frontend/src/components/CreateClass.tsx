@@ -1,5 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { api } from '../api'
+import { Alert, Spinner } from './ui'
+
+const PRESETS = ['Class 6 - Morning Shift', 'Class 6 - Day Shift', 'Class 7 - Morning Shift', 'Class 8 - Day Shift']
 
 export default function CreateClass() {
   const [name, setName] = useState('')
@@ -30,36 +33,37 @@ export default function CreateClass() {
 
   return (
     <section aria-labelledby="create-h">
-      <h2 id="create-h">Create a class (school admin)</h2>
-      <p className="muted">Each shift is its own class with its own seat limit, e.g. "Class 6 - Morning Shift".</p>
-      <form onSubmit={submit} className="form">
-        <label>
-          Class name
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Class 6 - Morning Shift" />
-        </label>
-        <label>
-          Total seats
-          <input
-            value={seats}
-            onChange={(e) => setSeats(e.target.value)}
-            inputMode="numeric"
-            placeholder="120"
-          />
-        </label>
-        <button type="submit" disabled={busy}>
-          {busy ? 'Creating…' : 'Create class'}
-        </button>
-      </form>
-      {error && (
-        <div className="alert error" role="alert">
-          {error}
+      <div className="section-head">
+        <div>
+          <h2 id="create-h">Create a class</h2>
+          <p>School admin: each shift is its own class with its own seat limit.</p>
         </div>
-      )}
-      {success && (
-        <div className="alert ok" role="status">
-          {success}
-        </div>
-      )}
+      </div>
+      <div className="card">
+        {error && <Alert kind="error">{error}</Alert>}
+        {success && <Alert kind="ok">{success}</Alert>}
+        <form onSubmit={submit} className="form">
+          <label>
+            Class name
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Class 6 - Morning Shift" />
+          </label>
+          <div className="chips" aria-label="Quick names">
+            {PRESETS.map((p) => (
+              <button type="button" className="chip" key={p} onClick={() => setName(p)}>
+                {p}
+              </button>
+            ))}
+          </div>
+          <label>
+            Total seats
+            <input value={seats} onChange={(e) => setSeats(e.target.value)} inputMode="numeric" placeholder="120" />
+          </label>
+          <button type="submit" className="btn" disabled={busy}>
+            {busy && <Spinner />}
+            {busy ? 'Creating…' : 'Create class'}
+          </button>
+        </form>
+      </div>
     </section>
   )
 }

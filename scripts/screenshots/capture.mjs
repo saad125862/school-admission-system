@@ -54,7 +54,7 @@ const holdId = await freshHold('Class 6 - Day Shift', STUDENT)
 }
 
 // ---------- Flutter app (web build in a phone-sized viewport) ----------
-{
+if (!process.env.SKIP_APP) {
   const page = await browser.newPage()
   await page.setViewport({ width: 390, height: 780, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
   await page.goto(APP, { waitUntil: 'networkidle0' })
