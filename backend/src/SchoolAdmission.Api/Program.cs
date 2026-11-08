@@ -191,16 +191,25 @@ static string ConnectionString(IConfiguration cfg)
 {
     var raw = Environment.GetEnvironmentVariable("DATABASE_URL") ?? cfg.GetConnectionString("Default")
         ?? "Host=localhost;Port=5432;Database=school_admission;Username=school;Password=school_pw";
-    if (!raw.StartsWith("postgres://") && !raw.StartsWith("postgresql://")) return raw;
-    // Neon/Render style URI -> Npgsql connection string
-    var u = new Uri(raw);
-    var ui = u.UserInfo.Split(':', 2);
-    var csb = new NpgsqlConnectionStringBuilder
+    NpgsqlConnectionStringBuilder csb;
+    if (raw.StartsWith("postgres://") || raw.StartsWith("postgresql://"))
     {
-        Host = u.Host, Port = u.Port > 0 ? u.Port : 5432, Database = u.AbsolutePath.TrimStart('/'),
-        Username = Uri.UnescapeDataString(ui[0]), Password = ui.Length > 1 ? Uri.UnescapeDataString(ui[1]) : "",
-        SslMode = SslMode.Require
-    };
+        // Neon/Render style URI -> Npgsql connection string
+        var u = new Uri(raw);
+        var ui = u.UserInfo.Split(':', 2);
+        csb = new NpgsqlConnectionStringBuilder
+        {
+            Host = u.Host, Port = u.Port > 0 ? u.Port : 5432, Database = u.AbsolutePath.TrimStart('/'),
+            Username = Uri.UnescapeDataString(ui[0]), Password = ui.Length > 1 ? Uri.UnescapeDataString(ui[1]) : "",
+            SslMode = SslMode.Require
+        };
+    }
+    else csb = new NpgsqlConnectionStringBuilder(raw);
+    // A small pool makes a burst of requests queue for a connection instead of exhausting Postgres' max_connections
+    // (each request holds its connection while it waits for the class row lock). Override via the connection string.
+    if (!raw.Contains("Maximum Pool Size", StringComparison.OrdinalIgnoreCase) && !raw.Contains("MaxPoolSize", StringComparison.OrdinalIgnoreCase))
+        csb.MaxPoolSize = 20;
+    if (!raw.Contains("Timeout", StringComparison.OrdinalIgnoreCase)) csb.Timeout = 60;
     return csb.ConnectionString;
 }
 
