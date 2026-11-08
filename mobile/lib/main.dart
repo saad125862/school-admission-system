@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'api.dart';
 import 'screens.dart';
 import 'state.dart';
+import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,7 +20,9 @@ class SchoolApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
         title: 'School Admission',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(colorSchemeSeed: const Color(0xFF0B5CAD), useMaterial3: true),
+        theme: buildTheme(Brightness.light),
+        darkTheme: buildTheme(Brightness.dark),
+        themeMode: context.select<AppState, ThemeMode>((s) => s.themeMode),
         home: const HomeScreen(),
       );
 }

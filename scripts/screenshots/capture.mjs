@@ -22,7 +22,9 @@ async function freshHold(className, student) {
   const c = classes.find((x) => x.name === className)
   const mine = await api('/me/holds', { headers: { 'X-Student-Id': student } })
   const old = mine.find((h) => h.classId === c.id && h.status === 'HELD')
-  if (old) return old.holdId
+  // reuse a still-fresh hold; otherwise cancel it and start a new one so the countdown ring looks right
+  if (old && new Date(old.expiresAt) - Date.now() > 8 * 60 * 1000) return old.holdId
+  if (old) await fetch(`${API}/holds/${old.holdId}`, { method: 'DELETE', headers: { 'X-Student-Id': student } })
   return (await api(`/classes/${c.id}/holds`, { method: 'POST', headers: { 'X-Student-Id': student } })).holdId
 }
 
@@ -70,15 +72,16 @@ if (!process.env.SKIP_APP) {
   const page = await browser.newPage()
   await page.setViewport({ width: 390, height: 780, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
   await page.goto(APP, { waitUntil: 'networkidle0' })
-  await page.evaluate((s) => localStorage.setItem('flutter.studentId', JSON.stringify(s)), STUDENT)
+  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: THEME }])
+  await page.evaluate((s, t) => { localStorage.setItem('flutter.studentId', JSON.stringify(s)); localStorage.setItem('flutter.theme', JSON.stringify(t)) }, STUDENT, THEME)
   const open = async () => { await page.goto(APP, { waitUntil: 'networkidle0' }); await sleep(2500) }
   const tap = async (x, y) => { await page.touchscreen.tap(x, y); await sleep(1200) }
   const shot = async (name) => { await sleep(500); await page.screenshot({ path: `${out}/${name}.png` }) }
-  const NAV_Y = 740
+  const NAV_Y = 746
 
   await open(); await shot('app-classes')
   await tap(195, NAV_Y); await shot('app-my-applications')
-  await tap(195, 168)    // first application card
+  await tap(195, 232)    // first application card (the HELD one)
   await sleep(1500); await shot('app-application')
   await open(); await tap(325, NAV_Y); await shot('app-create-class')
 }

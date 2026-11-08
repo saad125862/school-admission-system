@@ -53,7 +53,7 @@ export default function ApplicationView({ holdId, student, onBack }: Props) {
   const [busy, setBusy] = useState<'pay' | 'cancel' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const totalMs = useRef(0)
+  const totalMs = useRef(600_000) // default hold length; grows if the server reports longer
 
   const msLeft = hold ? new Date(hold.expiresAt).getTime() - now : 0
   if (hold?.status === 'HELD' && msLeft > totalMs.current) totalMs.current = msLeft

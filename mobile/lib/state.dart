@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
@@ -17,6 +18,7 @@ class AppState extends ChangeNotifier {
   final ApiClient api;
   SharedPreferences? _prefs;
   String studentInput = '';
+  ThemeMode themeMode = ThemeMode.system;
 
   String? get student => studentIdRx.hasMatch(studentInput.trim()) ? studentInput.trim() : null;
   String? get studentError =>
@@ -25,6 +27,7 @@ class AppState extends ChangeNotifier {
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
     studentInput = _prefs!.getString('studentId') ?? '';
+    themeMode = switch (_prefs!.getString('theme')) { 'dark' => ThemeMode.dark, 'light' => ThemeMode.light, _ => ThemeMode.system };
     const fromEnv = String.fromEnvironment('API_URL');
     if (fromEnv.isEmpty) api.baseUrl = _prefs!.getString('apiUrl') ?? api.baseUrl;
     notifyListeners();
@@ -33,6 +36,12 @@ class AppState extends ChangeNotifier {
   void setStudent(String v) {
     studentInput = v;
     _prefs?.setString('studentId', v);
+    notifyListeners();
+  }
+
+  void toggleTheme(bool currentlyDark) {
+    themeMode = currentlyDark ? ThemeMode.light : ThemeMode.dark;
+    _prefs?.setString('theme', currentlyDark ? 'light' : 'dark');
     notifyListeners();
   }
 
