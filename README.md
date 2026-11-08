@@ -29,6 +29,18 @@ First-come-first-served online admission for a private school. A student applies
 
 </details>
 
+## Live demo
+
+| | |
+|---|---|
+| Web app (Vercel) | https://school-admission-system-ebon.vercel.app |
+| API + Swagger (Render) | https://school-admission-system-pzr4.onrender.com/swagger |
+| Database | Neon PostgreSQL |
+
+The API runs on a free Render instance, so the first request after a quiet period can take ~50 seconds while it wakes up.
+
+![Live application screen](docs/screenshots/web-live-application.png)
+
 ## Run with Docker (the only requirement)
 
 ```bash
