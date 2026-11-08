@@ -25,6 +25,17 @@ async function freshHold(className, student) {
   return (await api(`/classes/${c.id}/holds`, { method: 'POST', headers: { 'X-Student-Id': student } })).holdId
 }
 
+// the demo student also has a confirmed admission, so "My applications" shows both a HELD and a CONFIRMED row
+async function ensureConfirmed(className, student) {
+  const classes = await api('/classes')
+  const c = classes.find((x) => x.name === className)
+  const mine = await api('/me/holds', { headers: { 'X-Student-Id': student } })
+  if (mine.some((h) => h.classId === c.id && h.status === 'CONFIRMED')) return
+  const hold = await api(`/classes/${c.id}/holds`, { method: 'POST', headers: { 'X-Student-Id': student } })
+  await api(`/holds/${hold.holdId}/confirm`, { method: 'POST', headers: { 'X-Student-Id': student } })
+}
+await ensureConfirmed('Class 8 - Morning Shift', STUDENT)
+
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox'] })
 const holdId = await freshHold('Class 6 - Day Shift', STUDENT)
 
@@ -35,10 +46,10 @@ const holdId = await freshHold('Class 6 - Day Shift', STUDENT)
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }])
   await page.goto(WEB, { waitUntil: 'networkidle0' })
   const setLs = (kv) => page.evaluate((o) => Object.entries(o).forEach(([k, v]) => localStorage.setItem(k, v)), kv)
-  const shot = async (name) => { await sleep(700); await page.screenshot({ path: `${out}/${name}.png` }) }
+  const shot = async (name, fullPage = false) => { await sleep(900); await page.screenshot({ path: `${out}/${name}.png`, fullPage }) }
 
   await setLs({ studentId: STUDENT, tab: 'classes', holdId: '' })
-  await page.reload({ waitUntil: 'networkidle0' }); await shot('web-classes')
+  await page.reload({ waitUntil: 'networkidle0' }); await shot('web-classes', true)
   await setLs({ tab: 'mine', holdId: '' })
   await page.reload({ waitUntil: 'networkidle0' }); await shot('web-my-applications')
   await setLs({ tab: 'mine', holdId })
