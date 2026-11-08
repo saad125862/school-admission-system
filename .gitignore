@@ -7,3 +7,5 @@ obj/
 build/
 *.pdf
 .claude/
+mobile/build/
+scripts/screenshots/node_modules/

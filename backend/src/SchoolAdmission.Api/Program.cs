@@ -56,7 +56,7 @@ async Task<(int held, int confirmed)> Counts(AppDb db, string classId, DateTime 
     return (rows.FirstOrDefault(r => r.Key == "HELD")?.N ?? 0, rows.FirstOrDefault(r => r.Key == "CONFIRMED")?.N ?? 0);
 }
 
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/health", () => Results.Ok(new { status = "ok" })).WithTags("System").WithSummary("Health check");
 
 // 1. Create class
 app.MapPost("/classes", async (CreateClass? req, AppDb db) =>
