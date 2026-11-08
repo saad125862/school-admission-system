@@ -10,6 +10,7 @@ const WEB = process.env.WEB_URL ?? 'http://localhost:3000'
 const APP = process.env.FLUTTER_URL ?? 'http://localhost:5174'
 const CHROME = process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const STUDENT = '20152691234567890'
+const THEME = process.env.THEME ?? 'dark' // 'dark' | 'light'
 const out = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../docs/screenshots')
 fs.mkdirSync(out, { recursive: true })
 
@@ -43,12 +44,12 @@ const holdId = await freshHold('Class 6 - Day Shift', STUDENT)
 {
   const page = await browser.newPage()
   await page.setViewport({ width: 1000, height: 720, deviceScaleFactor: 1.5 })
-  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }])
+  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: THEME }])
   await page.goto(WEB, { waitUntil: 'networkidle0' })
   const setLs = (kv) => page.evaluate((o) => Object.entries(o).forEach(([k, v]) => localStorage.setItem(k, v)), kv)
-  const shot = async (name, fullPage = false) => { await sleep(900); await page.screenshot({ path: `${out}/${name}.png`, fullPage }) }
+  const shot = async (name, fullPage = true) => { await sleep(900); await page.screenshot({ path: `${out}/${name}.png`, fullPage }) }
 
-  await setLs({ studentId: STUDENT, tab: 'classes', holdId: '' })
+  await setLs({ studentId: STUDENT, tab: 'classes', holdId: '', theme: THEME })
   await page.reload({ waitUntil: 'networkidle0' }); await shot('web-classes', true)
   await setLs({ tab: 'mine', holdId: '' })
   await page.reload({ waitUntil: 'networkidle0' }); await shot('web-my-applications')
