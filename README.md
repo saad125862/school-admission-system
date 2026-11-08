@@ -36,6 +36,7 @@ First-come-first-served online admission for a private school. A student applies
 | Web app (Vercel) | https://school-admission-system-ebon.vercel.app |
 | API + Swagger (Render) | https://school-admission-system-pzr4.onrender.com/swagger |
 | Database | Neon PostgreSQL |
+| Android app (APK) | [Download from Releases](https://github.com/saad125862/school-admission-system/releases/latest) |
 
 The API runs on a free Render instance, so the first request after a quiet period can take ~50 seconds while it wakes up.
 
