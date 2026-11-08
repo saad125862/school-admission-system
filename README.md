@@ -44,6 +44,15 @@ docker compose up --build
 
 Data lives in the named volume `pgdata`, so it survives `docker compose down` and `docker compose up`. (`docker compose down -v` deliberately wipes it.)
 
+### Demo data
+
+```bash
+python scripts/seed.py                       # local stack
+python scripts/seed.py https://your-backend   # any deployed backend
+```
+
+Creates a few classes and fills them with confirmed admissions (safe to re-run).
+
 ### Configuration (environment variables)
 
 | Variable | Service | Default | Meaning |
