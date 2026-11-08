@@ -17,7 +17,7 @@ First-come-first-served online admission for a private school. A student applies
 |---|---|---|
 | ![Application](docs/screenshots/web-application.png) | ![My applications](docs/screenshots/web-my-applications.png) | ![Create class](docs/screenshots/web-create-class.png) |
 
-**Flutter app**
+**Flutter app** (release APK on an Android emulator, running against the live backend)
 
 | Application + countdown | My applications | Create class |
 |---|---|---|
